@@ -1,6 +1,7 @@
 .idea
 *.iml
 *.pth
+*.mp4
 
 demo/image/*.py
 demo/image/output.jpeg
