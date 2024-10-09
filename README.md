@@ -1,7 +1,5 @@
 # analyse-it
 
-
-
 ## Getting started
 
 We are using the mmpose library for pose detection.  Steps to install below have been sourced from the following [installation guide](https://mmpose.readthedocs.io/en/latest/installation.html).
@@ -41,7 +39,6 @@ mim install "mmpose==1.3.1"
 - Step 5. Validate installation
 
 ```shell
-mim download mmpose --config td-hm_hrnet-w48_8xb32-210e_coco-256x192  --dest ./demo/image
 python image-demo.py
 ```
 
