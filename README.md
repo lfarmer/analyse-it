@@ -57,12 +57,12 @@ To deactivate an active environment, use
 ## Analysing Video
 
 Analysing video with [mmpose](https://mmpose.readthedocs.io/en/latest/) requires you to download different configuration
-files based on the analysis you want to perform.  Below we show the steps to perform `3D Human Pose` analysis.
+files based on the analysis you want to perform.  Below we show the steps to perform `2D Human Pose` analysis.
 
 ### Run Analysis
 
 - Copy video to analyse into the `input` directory
-- Run `python video-demo.py --input input/<video-filename>`
+- Run `python video-analysis.py --input input/<video-filename>`
 
 Wait some time for job to finish and output will be placed within the `output`. Check logs for location.
 Data that was used to generate analysis will also be output to `output/video/predictions`
