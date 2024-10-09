@@ -1,5 +1,3 @@
-import logging
-from mmengine.logging import print_log
 from mmpose.apis import MMPoseInferencer
 
 img_path = 'demo/image/demo.jpeg'   # replace this with your own image path

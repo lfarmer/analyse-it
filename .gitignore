@@ -3,5 +3,8 @@
 *.pth
 *.mp4
 
+**/predictions/
+**/visualizations/
+
 demo/image/*.py
 demo/image/output.jpeg
