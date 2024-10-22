@@ -27,7 +27,7 @@ def main():
     inferencer.inferencer.visualizer = Pose2dWithAnglesVisualizer(vis_backends=[dict(type='LocalVisBackend')])
     inferencer.inferencer.visualizer.set_dataset_meta(inferencer.inferencer.model.dataset_meta)
 
-    result_generator = inferencer(args.input, out_dir="output/video")
+    result_generator = inferencer(args.input, out_dir="output/")
     results = [result for result in result_generator]
 
 if __name__ == '__main__':

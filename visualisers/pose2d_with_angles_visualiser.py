@@ -1,5 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import math
 from typing import Dict, List, Optional, Tuple, Union
 
 import mmcv
@@ -7,7 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from mmengine.dist import master_only
-from mmengine.structures import InstanceData, PixelData
+from mmengine.structures import InstanceData
 
 from mmpose.datasets.datasets.utils import parse_pose_metainfo
 from mmpose.registry import VISUALIZERS
@@ -112,7 +111,7 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
 
         plt.ioff()
 
-        fig, ax = plt.subplots(1, 1, figsize=(vis_width * 0.01, vis_height * 0.01))
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, width_ratios=[1,2,1], figsize=(vis_width * 0.01, vis_height * 0.01))
 
         left_hip_angle = person.get_joint_angle(person.get_left_hip_angle_keypoints())
         right_hip_angle = person.get_joint_angle(person.get_right_hip_angle_keypoints())
@@ -122,11 +121,14 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
         right_ankle_angle = person.get_joint_angle(person.get_right_ankle_angle_keypoints())
 
         data = np.array([[left_hip_angle], [right_hip_angle], [left_knee_angle], [right_knee_angle], [left_ankle_angle], [right_ankle_angle]])
-        columns = "Angle"
+        columns = ("A")
         rows = ("Left Hip", "Right Hip", "Left Knee", "Right Knee", "Left Ankle", "Right Ankle")
-        # ax.axis('tight')
-        ax.axis('off')
-        the_table = ax.table(cellText=data, colLabels=columns, colLoc='center', rowLabels=rows, rowLoc='center',  loc='center')
+        ax1.axis('off')
+        ax3.axis('off')
+
+        ax2.axis('off')
+        ax2.set_title('Angles')
+        ax2.table(cellText=data, colLabels=columns, colLoc='center', rowLabels=rows, rowLoc='center',  loc='center')
 
         # convert figure to numpy array
         fig.tight_layout()
@@ -333,13 +335,14 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
 
                 # draw each point on image
                 for bid, body_part in enumerate(person.body_parts):
-                    if body_part.score < kpt_thr or body_part.not_visible or kpt_color[bid] is None:
+                    if (body_part.score < kpt_thr
+                            or body_part.not_visible
+                            or MMPoseKeypoint.is_face_id(body_part.skeleton_id)
+                            or kpt_color[bid] is None):
                         # skip the point that should not be drawn
                         continue
 
                     color = kpt_color[bid]
-                    kp_x = body_part.keypoint[0]
-                    kp_y = body_part.keypoint[1]
                     if not isinstance(color, str):
                         color = tuple(int(c) for c in color)
                     transparency = self.alpha
@@ -352,17 +355,6 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
                         edge_colors=color,
                         alpha=transparency,
                         line_widths=self.radius)
-                    if show_kpt_idx:
-                        kp_x += self.radius
-                        kp_y -= self.radius
-                        self.draw_texts(
-                            str(bid),
-                            body_part.keypoint,
-                            colors=color,
-                            font_sizes=self.radius * 3,
-                            vertical_alignments='bottom',
-                            horizontal_alignments='center')
-
         return self.get_image()
 
     @master_only
