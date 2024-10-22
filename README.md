@@ -56,8 +56,8 @@ To deactivate an active environment, use
 
 ## Analysing Video
 
-Analysing video with [mmpose](https://mmpose.readthedocs.io/en/latest/) requires you to download different configuration
-files based on the analysis you want to perform.  Below we show the steps to perform `2D Human Pose` analysis.
+Below we show the steps to perform `2D Human Pose` analysis using MMPoseInferencer.  
+This is set up with a bespoke visualiser to draw a joint angles table alongside the supplied video.
 
 ### Run Analysis
 

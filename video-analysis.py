@@ -1,6 +1,8 @@
 from mmpose.apis import MMPoseInferencer
 from argparse import ArgumentParser
 
+from visualisers import Pose2dWithAnglesVisualizer
+
 try:
     from mmdet.apis import inference_detector, init_detector
     has_mmdet = True
@@ -21,11 +23,10 @@ def main():
 
     assert args.input != ''
 
-    # instantiate the inferencer using the model alias
     inferencer = MMPoseInferencer(pose2d='body26', show_progress=True, device='cpu')
+    inferencer.inferencer.visualizer = Pose2dWithAnglesVisualizer(vis_backends=[dict(type='LocalVisBackend')])
+    inferencer.inferencer.visualizer.set_dataset_meta(inferencer.inferencer.model.dataset_meta)
 
-    # The MMPoseInferencer API employs a lazy inference approach,
-    # creating a prediction generator when given input
     result_generator = inferencer(args.input, out_dir="output/video")
     results = [result for result in result_generator]
 
