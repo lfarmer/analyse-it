@@ -2,6 +2,8 @@
 *.iml
 *.pth
 *.mp4
+*.mov
+*.AAE
 
 **/predictions/
 **/visualizations/

@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import functools
 from typing import Dict, List, Optional, Tuple, Union
 
 import mmcv
@@ -106,29 +107,37 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
     @staticmethod
     def draw_angle_data_table(self,
                               image: np.ndarray,
-                              person: PosePerson):
-        vis_height, vis_width = image.shape[:2]
+                              people=None):
 
         plt.ioff()
+        vis_height, vis_width = image.shape[:2]
 
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, width_ratios=[1,2,1], figsize=(vis_width * 0.01, vis_height * 0.01))
 
-        left_hip_angle = person.get_joint_angle(person.get_left_hip_angle_keypoints())
-        right_hip_angle = person.get_joint_angle(person.get_right_hip_angle_keypoints())
-        left_knee_angle = person.get_joint_angle(person.get_left_knee_angle_keypoints())
-        right_knee_angle = person.get_joint_angle(person.get_right_knee_angle_keypoints())
-        left_ankle_angle = person.get_joint_angle(person.get_left_ankle_angle_keypoints())
-        right_ankle_angle = person.get_joint_angle(person.get_right_ankle_angle_keypoints())
+        columns = []
 
-        data = np.array([[left_hip_angle], [right_hip_angle], [left_knee_angle], [right_knee_angle], [left_ankle_angle], [right_ankle_angle]])
-        columns = ("A")
-        rows = ("Left Hip", "Right Hip", "Left Knee", "Right Knee", "Left Ankle", "Right Ankle")
+        if people is None:
+            people = []
+
+        person_angles = np.empty((6, len(people)))
+
+        for i, person in enumerate(people):
+            columns.append(str(i + 1))
+
+            person_angles[0, i] = person.get_joint_angle(person.get_left_hip_angle_keypoints())
+            person_angles[1, i] = person.get_joint_angle(person.get_right_hip_angle_keypoints())
+            person_angles[2, i] = person.get_joint_angle(person.get_left_knee_angle_keypoints())
+            person_angles[3, i] = person.get_joint_angle(person.get_right_knee_angle_keypoints())
+            person_angles[4, i] = person.get_joint_angle(person.get_left_ankle_angle_keypoints())
+            person_angles[5, i] = person.get_joint_angle(person.get_right_ankle_angle_keypoints())
+
+        rows = ("Left Hip", "Right  Hip", "Left Knee", "Right Knee", "Left Ankle", "Right Ankle")
         ax1.axis('off')
         ax3.axis('off')
 
         ax2.axis('off')
         ax2.set_title('Angles')
-        ax2.table(cellText=data, colLabels=columns, colLoc='center', rowLabels=rows, rowLoc='center',  loc='center')
+        ax2.table(cellText=person_angles, colLabels=columns, colLoc='center', rowLabels=rows, rowLoc='center',  loc='center')
 
         # convert figure to numpy array
         fig.tight_layout()
@@ -236,8 +245,7 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
 
     def _draw_instances_kpts(self,
                              image: np.ndarray,
-                             person: PosePerson,
-                             instances: InstanceData,
+                             people=None,
                              kpt_thr: float = 0.3,
                              show_kpt_idx: bool = False,
                              skeleton_style: str = 'mmpose'):
@@ -258,103 +266,89 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
             np.ndarray: the drawn image which channel is RGB.
         """
 
+        if people is None:
+            people = []
+
         self.set_image(image)
         img_h, img_w, _ = image.shape
 
-        if 'keypoints' in instances:
-            keypoints = instances.get('transformed_keypoints',
-                                      instances.keypoints)
-
-            if 'keypoint_scores' in instances:
-                scores = instances.keypoint_scores
+        for person in people:
+            if self.kpt_color is None or isinstance(self.kpt_color, str):
+                kpt_color = [self.kpt_color] * len(person.keypoints)
+            elif len(self.kpt_color) == len(person.keypoints):
+                kpt_color = self.kpt_color
             else:
-                scores = np.ones(keypoints.shape[:-1])
+                raise ValueError(
+                    f'the length of kpt_color '
+                    f'({len(self.kpt_color)}) does not matches '
+                    f'that of keypoints ({len(person.keypoints)})')
 
-            if 'keypoints_visible' in instances:
-                keypoints_visible = instances.keypoints_visible
-            else:
-                keypoints_visible = np.ones(keypoints.shape[:-1])
-
-
-            for kpts, score, visible in zip(keypoints, scores,
-                                            keypoints_visible):
-                kpts = np.array(kpts, copy=False)
-
-                if self.kpt_color is None or isinstance(self.kpt_color, str):
-                    kpt_color = [self.kpt_color] * len(kpts)
-                elif len(self.kpt_color) == len(kpts):
-                    kpt_color = self.kpt_color
+            # draw links
+            if self.skeleton is not None and self.link_color is not None:
+                if self.link_color is None or isinstance(
+                        self.link_color, str):
+                    link_color = [self.link_color] * len(self.skeleton)
+                elif len(self.link_color) == len(self.skeleton):
+                    link_color = self.link_color
                 else:
                     raise ValueError(
-                        f'the length of kpt_color '
-                        f'({len(self.kpt_color)}) does not matches '
-                        f'that of keypoints ({len(kpts)})')
+                        f'the length of link_color '
+                        f'({len(self.link_color)}) does not matches '
+                        f'that of skeleton ({len(self.skeleton)})')
 
-                # draw links
-                if self.skeleton is not None and self.link_color is not None:
-                    if self.link_color is None or isinstance(
-                            self.link_color, str):
-                        link_color = [self.link_color] * len(self.skeleton)
-                    elif len(self.link_color) == len(self.skeleton):
-                        link_color = self.link_color
-                    else:
-                        raise ValueError(
-                            f'the length of link_color '
-                            f'({len(self.link_color)}) does not matches '
-                            f'that of skeleton ({len(self.skeleton)})')
-
-                    for sk_id, sk in enumerate(self.skeleton):
-                        body_part1 = person.body_parts[sk[0]]
-                        body_part2 = person.body_parts[sk[1]]
-                        if body_part1.not_visible and body_part2.not_visible:
-                            continue
-
-                        if (body_part1.visible_within_image(img_h, img_w)
-                                or body_part2.visible_within_image(img_h, img_w)
-                                or body_part1.score < kpt_thr
-                                or body_part2.score < kpt_thr
-                                or MMPoseKeypoint.is_face_id(body_part1.skeleton_id)
-                                or MMPoseKeypoint.is_face_id(body_part2.skeleton_id)
-                                or link_color[sk_id] is None):
-                            # skip the link that should not be drawn
-                            continue
-
-                        x = np.array((int(body_part1.keypoint[0]), int(body_part2.keypoint[0])))
-                        y = np.array((int(body_part1.keypoint[1]), int(body_part2.keypoint[1])))
-
-                        color = link_color[sk_id]
-                        if not isinstance(color, str):
-                            color = tuple(int(c) for c in color)
-
-                        transparency = self.alpha
-                        if self.show_keypoint_weight:
-                            transparency *= max(
-                                0, min(1, 0.5 * (body_part1.score + body_part2.score)))
-
-                        self.draw_lines(x, y, color, line_widths=self.line_width)
-
-                # draw each point on image
-                for bid, body_part in enumerate(person.body_parts):
-                    if (body_part.score < kpt_thr
-                            or body_part.not_visible
-                            or MMPoseKeypoint.is_face_id(body_part.skeleton_id)
-                            or kpt_color[bid] is None):
-                        # skip the point that should not be drawn
+                for sk_id, sk in enumerate(self.skeleton):
+                    body_part1 = person.body_parts[sk[0]]
+                    body_part2 = person.body_parts[sk[1]]
+                    if body_part1.not_visible and body_part2.not_visible:
                         continue
 
-                    color = kpt_color[bid]
+                    if (body_part1.visible_within_image(img_h, img_w)
+                            or body_part2.visible_within_image(img_h, img_w)
+                            or body_part1.score < kpt_thr
+                            or body_part2.score < kpt_thr
+                            or MMPoseKeypoint.is_face_id(body_part1.skeleton_id)
+                            or MMPoseKeypoint.is_face_id(body_part2.skeleton_id)
+                            or link_color[sk_id] is None):
+                        # skip the link that should not be drawn
+                        continue
+
+                    x = np.array((int(body_part1.keypoint[0]), int(body_part2.keypoint[0])))
+                    y = np.array((int(body_part1.keypoint[1]), int(body_part2.keypoint[1])))
+
+                    color = link_color[sk_id]
                     if not isinstance(color, str):
                         color = tuple(int(c) for c in color)
+
                     transparency = self.alpha
                     if self.show_keypoint_weight:
-                        transparency *= max(0, min(1, body_part.score))
-                    self.draw_circles(
-                        body_part.keypoint,
-                        radius=np.array([self.radius]),
-                        face_colors=color,
-                        edge_colors=color,
-                        alpha=transparency,
-                        line_widths=self.radius)
+                        transparency *= max(
+                            0, min(1, 0.5 * (body_part1.score + body_part2.score)))
+
+                    self.draw_lines(x, y, color, line_widths=self.line_width)
+
+            # draw each point on image
+            for bid, body_part in enumerate(person.body_parts):
+                if (body_part.score < kpt_thr
+                        or body_part.not_visible
+                        or MMPoseKeypoint.is_face_id(body_part.skeleton_id)
+                        or kpt_color[bid] is None):
+                    # skip the point that should not be drawn
+                    continue
+
+                color = kpt_color[bid]
+                if not isinstance(color, str):
+                    color = tuple(int(c) for c in color)
+                transparency = self.alpha
+                if self.show_keypoint_weight:
+                    transparency *= max(0, min(1, body_part.score))
+                self.draw_circles(
+                    body_part.keypoint,
+                    radius=np.array([self.radius]),
+                    face_colors=color,
+                    edge_colors=color,
+                    alpha=transparency,
+                    line_widths=self.radius)
+
         return self.get_image()
 
     @master_only
@@ -366,7 +360,7 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
                        draw_pred: bool = True,
                        draw_heatmap: bool = False,
                        draw_bbox: bool = False,
-                       show_kpt_idx: bool = True,
+                       show_kpt_idx: bool = False,
                        skeleton_style: str = 'mmpose',
                        show: bool = False,
                        wait_time: float = 0,
@@ -412,34 +406,52 @@ class Pose2dWithAnglesVisualizer(OpencvBackendVisualizer):
 
         gt_img_data = None
         pred_img_data = None
-        person = PosePerson(image,
-                            data_sample.pred_instances,
-                            self.skeleton,
-                            self.dataset_meta.get('keypoint_id2name'),
-                            'mmpose')
-        person.build()
+        identified_people = []
 
+        if 'keypoints' in data_sample.pred_instances:
+            keypoints = data_sample.pred_instances.get('transformed_keypoints', data_sample.pred_instances.keypoints)
+
+            if 'keypoint_scores' in data_sample.pred_instances:
+                scores = data_sample.pred_instances.keypoint_scores
+            else:
+                scores = np.ones(keypoints.shape[:-1])
+
+            if 'keypoints_visible' in data_sample.pred_instances:
+                keypoints_visible = data_sample.pred_instances.keypoints_visible
+            else:
+                keypoints_visible = np.ones(keypoints.shape[:-1])
+
+            if 'bboxes' in data_sample.pred_instances:
+                bboxes = data_sample.pred_instances.bboxes
+
+            for kpts, score, bbox, visible in zip(keypoints, scores, bboxes, keypoints_visible):
+                person = PosePerson(image,
+                                    kpts,
+                                    visible,
+                                    score,
+                                    bbox,
+                                    self.skeleton,
+                                    self.dataset_meta.get('keypoint_id2name'),
+                                    'mmpose')
+                person.build()
+                identified_people.append(person)
+
+        identified_people = [functools.reduce(lambda a, b: a if a.get_size() > b.get_size() else b, identified_people)]
         if draw_pred:
+
             pred_img_data = image.copy()
+
             # draw bboxes & keypoints
             if 'pred_instances' in data_sample:
                 pred_img_data = self._draw_instances_kpts(
-                    pred_img_data, person, data_sample.pred_instances, kpt_thr,
+                    pred_img_data, identified_people, kpt_thr,
                     show_kpt_idx, skeleton_style)
                 if draw_bbox:
                     pred_img_data = self._draw_instances_bbox(
                         pred_img_data, data_sample.pred_instances)
 
-        pred_table_data = self.draw_angle_data_table(self,
-                                                     image.copy(),
-                                                     person)
-
-        # merge visualization results
-        if gt_img_data is not None:
-            drawn_img = gt_img_data
-        else:
+            pred_table_data = self.draw_angle_data_table(self, image.copy(), identified_people,)
             drawn_img = np.concatenate((pred_img_data, pred_table_data), axis=1)
-            # drawn_img = pred_img_data
 
         # It is convenient for users to obtain the drawn image.
         # For example, the user wants to obtain the drawn image and
